@@ -29,17 +29,6 @@ void vmem_file_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t len) 
 
 void vmem_file_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len) {
 	memcpy(((vmem_file_driver_t *) vmem->driver)->physaddr + addr, datain, len);
-
-	/* Flush back to file */
-	FILE * stream = fopen(((vmem_file_driver_t *) vmem->driver)->filename, "w+");
-	if (stream == NULL) {
-		printf("Failed to open file %s\n", ((vmem_file_driver_t *) vmem->driver)->filename);
-		return;
-	}
-	int written = fwrite(((vmem_file_driver_t *) vmem->driver)->physaddr, 1, vmem->size, stream);
-	(void) written;
-	//printf("Wrote %d bytes to %s\n", written, ((vmem_file_driver_t *) vmem->driver)->filename);
-	fclose(stream);
 }
 
 
