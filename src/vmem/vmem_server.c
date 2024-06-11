@@ -214,6 +214,33 @@ void vmem_server_handler(csp_conn_t * conn)
 
 		csp_send(conn, packet);
 
+	/**
+	 * RING BUFFER DOWNLOAD
+	 */
+	} else if (request->type == VMEM_SERVER_RING_DOWNLOAD) {
+
+
+	/**
+	 * RING BUFFER UPLOAD
+	 */
+	} else if (request->type == VMEM_SERVER_RING_UPLOAD) {
+
+		csp_buffer_free(packet);
+
+		int count = 0;
+		while((packet = csp_read(conn, VMEM_SERVER_TIMEOUT)) != NULL) {
+
+			//csp_hex_dump("Upload", packet->data, packet->length);
+
+			/* Put data */
+			vmem_memcpy((void *) ((intptr_t) address + count), packet->data, packet->length);
+
+			/* Increment */
+			count += packet->length;
+
+			csp_buffer_free(packet);
+		}
+
 	} else {
 
 		/* Free packet if not valid VMEM service request */

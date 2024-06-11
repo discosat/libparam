@@ -24,6 +24,8 @@ typedef enum {
 	VMEM_SERVER_BACKUP,
 	VMEM_SERVER_UNLOCK,
 	VMEM_SERVER_CALCULATE_CRC32,
+	VMEM_SERVER_RING_UPLOAD,
+	VMEM_SERVER_RING_DOWNLOAD,
 } vmem_request_type;
 
 typedef struct {
@@ -44,6 +46,10 @@ typedef struct {
 		struct {
 			uint32_t code;
 		} unlock;
+		struct {
+			uint8_t vmem_id;
+			int offset;
+		} ring;
 	};
 } __attribute__((packed)) vmem_request_t;
 
