@@ -170,6 +170,159 @@ int vmem_upload(int node, int timeout, uint64_t address, char * datain, uint32_t
 	return count;
 }
 
+int vmem_ring_upload(int node, int timeout, const char * vmem_name, char * datain, uint32_t length, int version) {
+
+	uint32_t time_begin = csp_get_ms();
+
+	/* Establish RDP connection */
+	csp_conn_t * conn = csp_connect(CSP_PRIO_HIGH, node, VMEM_PORT_SERVER, timeout, CSP_O_RDP | CSP_O_CRC32);
+	if (conn == NULL) {
+		printf("Connection could not be established\n");
+		return -1;
+	}
+
+	csp_packet_t * packet = csp_buffer_get(sizeof(vmem_request_t));
+	if (packet == NULL)
+		return -1;
+
+	vmem_request_t * request = (void *) packet->data;
+	request->version = version;
+	request->type = VMEM_SERVER_RING_UPLOAD;
+	request->ring.offset = length;
+	request->ring.vmem_name = vmem_name;
+	packet->length = sizeof(vmem_request_t);
+
+	/* Send request */
+	csp_send(conn, packet);
+
+	unsigned int count = 0;
+	int dotcount = 0;
+	while((count < length) && csp_conn_is_active(conn)) {
+
+		if (dotcount % 32 == 0)
+			printf("  ");
+		printf(".");
+		fflush(stdout);
+		dotcount++;
+		if (dotcount % 32 == 0)
+			printf(" - %.0f K\n", (count / 1024.0));
+
+		/* Prepare packet */
+		csp_packet_t * packet = csp_buffer_get(VMEM_SERVER_MTU);
+		packet->length = VMEM_MIN(VMEM_SERVER_MTU, length - count);
+
+		/* Copy data */
+		memcpy(packet->data, (void *) ((intptr_t) datain + count), packet->length);
+
+		/* Increment */
+		count += packet->length;
+
+		csp_send(conn, packet);
+
+	}
+
+	printf(" - %.0f K\n", (count / 1024.0));
+
+	csp_close(conn);
+
+	uint32_t time_total = csp_get_ms() - time_begin;
+
+	if(count != length){
+		unsigned int window_size = 0;
+		csp_rdp_get_opt(&window_size, NULL, NULL, NULL, NULL, NULL);
+		printf("Upload didn't complete, suggested offset to resume: %u\n", count - ((window_size + 1) * VMEM_SERVER_MTU));
+		return -1;
+	} else {
+		printf("  Uploaded %u bytes in %.03f s at %u Bps\n", (unsigned int) count, time_total / 1000.0, (unsigned int) (count / ((float)time_total / 1000.0)) );
+	}
+
+	return count;
+}
+
+int vmem_ring_download(int node, int timeout, const char * vmem_name, uint32_t offset, char * dataout, int version, int use_rdp)
+{
+	uint32_t time_begin = csp_get_ms();
+
+	/* Establish RDP connection */
+	uint32_t opts = CSP_O_CRC32;
+	if (use_rdp) {
+		opts |= CSP_O_RDP;
+	}
+	csp_conn_t * conn = csp_connect(CSP_PRIO_HIGH, node, VMEM_PORT_SERVER, timeout, opts);
+	if (conn == NULL)
+		return -1;
+
+	csp_packet_t * packet = csp_buffer_get(sizeof(vmem_request_t));
+	if (packet == NULL)
+		return -1;
+
+	vmem_request_t * request = (void *) packet->data;
+	request->version = version;
+	request->type = VMEM_SERVER_RING_DOWNLOAD;
+	request->ring.offset = offset;
+	request->ring.vmem_name = vmem_name;
+	packet->length = sizeof(vmem_request_t);
+
+	/* Send request */
+	csp_send(conn, packet);
+
+	packet = csp_read(conn, timeout);
+	if (packet == NULL)
+		return;
+	uint32_t length = *(uint32_t *)packet->data;
+	csp_buffer_free(packet);
+
+	/* Go into download loop */
+	unsigned int count = 0;
+	int dotcount = 0;
+
+	while(1) { 
+
+		if (count == length)
+			break;
+
+		/* Blocking read */
+		packet = csp_read(conn, timeout);
+		if (packet == NULL)
+			break;
+
+		//csp_hex_dump("Download", packet->data, packet->length);
+
+		/* RX overflow check */
+		if (count + packet->length > length) {
+			csp_buffer_free(packet);
+			break;
+		}
+
+		if (dotcount % 32 == 0)
+			printf("  ");
+		printf(".");
+		fflush(stdout);
+		dotcount++;
+		if (dotcount % 32 == 0)
+			printf(" - %.0f K\n", (count / 1024.0));
+
+		/* Put data */
+		memcpy((void *) ((intptr_t) dataout + count), packet->data, packet->length);
+
+		/* Increment */
+		count += packet->length;
+
+		csp_buffer_free(packet);
+	}
+
+	printf(" - %.0f K\n", (count / 1024.0));
+
+	csp_close(conn);
+
+	uint32_t time_total = csp_get_ms() - time_begin;
+
+	printf("  Downloaded %u bytes in %.03f s at %u Bps\n", (unsigned int) count, time_total / 1000.0, (unsigned int) (count / ((float)time_total / 1000.0)) );
+
+	return count;
+
+}
+
 static csp_packet_t * vmem_client_list_get(int node, int timeout, int version) {
 
 	csp_conn_t * conn = csp_connect(CSP_PRIO_HIGH, node, VMEM_PORT_SERVER, timeout, CSP_O_CRC32);

@@ -23,8 +23,8 @@ typedef struct {
 	param_t * head_p;
 } vmem_ring_driver_t;
 
-void vmem_ring_read(vmem_t * vmem, void * dataout, int offset);
-void vmem_ring_write(vmem_t * vmem, const void * datain, uint32_t len);
+void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, int offset);
+void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len);
 
 #define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, max_entries) \
 	__attribute__((section("vmem"))) \
@@ -34,8 +34,8 @@ void vmem_ring_write(vmem_t * vmem, const void * datain, uint32_t len);
 		.type = VMEM_TYPE_FILE, \
 		.name = strname, \
 		.size = size_in + (max_entries * sizeof(uint32_t)) + 8, \
-		.read = vmem_file_read, \
-		.write = vmem_file_write, \
+		.read = vmem_ring_read, \
+		.write = vmem_ring_write, \
 		.ack_with_pull = 1, \
 	}; \
     PARAM_DEFINE_STATIC_VMEM(OFFSETS_ID, offsets, PARAM_TYPE_INT32, max_entries, sizeof(uint32_t), PM_CONF, NULL, NULL, name_in, size_in, "Ring buffer image offsets"); \

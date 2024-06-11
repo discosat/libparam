@@ -47,8 +47,8 @@ typedef struct {
 			uint32_t code;
 		} unlock;
 		struct {
-			uint8_t vmem_id;
-			int offset;
+			char vmem_name[5];
+			uint32_t offset;
 		} ring;
 	};
 } __attribute__((packed)) vmem_request_t;
