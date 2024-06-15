@@ -13,7 +13,7 @@
 
 int vmem_download(int node, int timeout, uint64_t address, uint32_t length, char * dataout, int version, int use_rdp);
 int vmem_upload(int node, int timeout, uint64_t address, char * datain, uint32_t length, int version);
-int vmem_ring_download(int node, int timeout, const char * vmem_name, uint32_t offset, char * dataout, int version, int use_rdp);
+int vmem_ring_download(int node, int timeout, const char * vmem_name, int offset, char * dataout, int version, int use_rdp);
 int vmem_ring_upload(int node, int timeout, const char * vmem_name, char * datain, uint32_t length, int version);
 void vmem_client_list(int node, int timeout, int version);
 int vmem_client_find(int node, int timeout, void * dataout, int version, char * name, int namelen);

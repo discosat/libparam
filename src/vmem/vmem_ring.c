@@ -18,8 +18,8 @@ void vmem_ring_init(vmem_t * vmem) {
 		return;
     
     fseek(stream, driver->data_size, SEEK_SET);
-	fread(driver->tail, 1, sizeof(uint32_t), stream);
-	fread(driver->head, 1, sizeof(uint32_t), stream);
+	fread(&driver->tail, 1, sizeof(uint32_t), stream);
+	fread(&driver->head, 1, sizeof(uint32_t), stream);
     fread(driver->offsets, 1, driver->entries * sizeof(uint32_t), stream);
 	fclose(stream);
 }
@@ -31,10 +31,10 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
     uint32_t tail = driver->tail;
     uint32_t * offsets = (uint32_t *)driver->offsets;
 
-    // uint32_t read_from_index = offset < 0 // supports negative indexing from head (requires int for offset)
-    //     ? (head + offset + driver->entries) % driver->entries
-    //     : (tail + offset) % driver->entries;
-    uint32_t read_from_index = (tail + offset) % driver->entries;
+    int offset_int = (int)offset;
+    uint32_t read_from_index = offset_int < 0 // supports negative indexing from head
+        ? (head + offset_int + driver->entries) % driver->entries
+        : (tail + offset_int) % driver->entries;
     uint32_t read_to_index = (read_from_index + 1) % driver->entries;
 
     uint32_t read_from_offset = offsets[read_from_index];
@@ -51,13 +51,13 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
         uint32_t len_fst = driver->data_size - read_from_offset;
         uint32_t len_snd = read_to_offset;
         fseek(stream, read_from_offset, SEEK_SET);
-        size_t read_fst = fread(dataout, 1, len_fst, stream); // read first part
+        fread(dataout, 1, len_fst, stream); // read first part
         fseek(stream, 0, SEEK_SET);
-        size_t read_snd = fread(dataout + len_fst, 1, len_snd, stream); // read second part
+        fread(dataout + len_fst, 1, len_snd, stream); // read second part
     } else {
         uint32_t len = read_to_offset - read_from_offset;
         fseek(stream, read_from_offset, SEEK_SET);
-        size_t read = fread(dataout, 1, len, stream);
+        fread(dataout, 1, len, stream);
     }
     fclose(stream);
 }
@@ -115,12 +115,12 @@ void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t
         uint32_t len_fst = driver->data_size - insert_offset;
         uint32_t len_snd = new_head_offset;
         fseek(stream, insert_offset, SEEK_SET);
-        size_t wrote_fst = fwrite(datain, 1, len_fst, stream); // write first part
+        fwrite(datain, 1, len_fst, stream); // write first part
         fseek(stream, 0, SEEK_SET);
-        size_t wrote_snd = fwrite(datain + len_fst, 1, len_snd, stream); // write second part
+        fwrite(datain + len_fst, 1, len_snd, stream); // write second part
     } else {
         fseek(stream, insert_offset, SEEK_SET);
-        size_t wrote = fwrite(datain, 1, len, stream);
+        fwrite(datain, 1, len, stream);
     }
 
     /* Update driver values (tail, head, offsets) */

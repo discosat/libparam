@@ -239,7 +239,7 @@ int vmem_ring_upload(int node, int timeout, const char * vmem_name, char * datai
 	return count;
 }
 
-int vmem_ring_download(int node, int timeout, const char * vmem_name, uint32_t offset, char * dataout, int version, int use_rdp)
+int vmem_ring_download(int node, int timeout, const char * vmem_name, int offset, char * dataout, int version, int use_rdp)
 {
 	uint32_t time_begin = csp_get_ms();
 
@@ -259,7 +259,7 @@ int vmem_ring_download(int node, int timeout, const char * vmem_name, uint32_t o
 	vmem_request_t * request = (void *) packet->data;
 	request->version = version;
 	request->type = VMEM_SERVER_RING_DOWNLOAD;
-	request->ring.offset = offset;
+	request->ring.offset = (uint32_t)offset;
 	strncpy(request->ring.vmem_name, vmem_name, 5);
 	packet->length = sizeof(vmem_request_t);
 

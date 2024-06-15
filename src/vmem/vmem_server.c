@@ -239,7 +239,10 @@ void vmem_server_handler(csp_conn_t * conn)
 		uint32_t tail = driver->tail;
 		uint32_t * offsets = (uint32_t *)driver->offsets;
 
-		uint32_t read_from_index = (tail + offset) % driver->entries;
+		int offset_int = (int)offset;
+		uint32_t read_from_index = offset_int < 0 // supports negative indexing from head
+			? (head + offset_int + driver->entries) % driver->entries
+			: (tail + offset_int) % driver->entries;
 		uint32_t read_to_index = (read_from_index + 1) % driver->entries;
 
 		uint32_t read_from_offset = offsets[read_from_index];
