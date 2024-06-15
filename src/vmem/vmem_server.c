@@ -22,6 +22,8 @@
 #include <libparam.h>
 #include <param/param_server.h>
 
+#include <vmem/vmem_ring.h>
+
 static int unlocked = 0;
 
 void vmem_server_handler(csp_conn_t * conn)
@@ -220,7 +222,7 @@ void vmem_server_handler(csp_conn_t * conn)
 	} else if (request->type == VMEM_SERVER_RING_DOWNLOAD) {
 
 		vmem_t *ring;
-		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++, i++) {
+		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++) {
 			if (strncmp(request->ring.vmem_name, vmem->name, 5)) {
 				ring = vmem;
 				break;
@@ -232,19 +234,22 @@ void vmem_server_handler(csp_conn_t * conn)
 
 		/* Find size of download */	
 		vmem_ring_driver_t * driver = (vmem_ring_driver_t *)ring->driver;
-		uint32_t head = param_get_uint32(driver->head_p);
-		uint32_t tail = param_get_uint32(driver->tail_p);
-		uint32_t read_index = offset < 0 
-			? (head + offset + driver->entries) % driver->entries
-			: (tail + offset) % driver->entries;
-		uint32_t read_from = param_get_uint32_array(driver->offsets_p, read_index);
-		uint32_t read_to = param_get_uint32_array(driver->offsets_p, read_index+1);
-		uint32_t length = read_from > read_to 
-			? (driver->size - read_from) + read_to
-			: read_to - read_from;
+
+		uint32_t head = driver->head;
+		uint32_t tail = driver->tail;
+		uint32_t * offsets = (uint32_t *)driver->offsets;
+
+		uint32_t read_from_index = (tail + offset) % driver->entries;
+		uint32_t read_to_index = (read_from_index + 1) % driver->entries;
+
+		uint32_t read_from_offset = offsets[read_from_index];
+		uint32_t read_to_offset = offsets[read_to_index];
+		uint32_t length = read_from_index > read_to_offset
+			? driver->data_size - read_from_offset + read_to_offset
+			: read_to_offset - read_from_offset;
 
 		/* Read image data from ring-buffer */
-		void buffer[length];
+		void * buffer[length];
 		ring->read(ring, 0, buffer, offset);
 
 		/* Send download size to client */
@@ -285,7 +290,7 @@ void vmem_server_handler(csp_conn_t * conn)
 	 */
 	} else if (request->type == VMEM_SERVER_RING_UPLOAD) {
 		int length = request->ring.offset;
-		void buffer[length];
+		void * buffer[length];
 
 		csp_buffer_free(packet);
 
@@ -305,7 +310,7 @@ void vmem_server_handler(csp_conn_t * conn)
 
 		/* After transfer, write data to VMEM */
 		vmem_t *ring;
-		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++, i++) {
+		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++) {
 			if (strncmp(request->ring.vmem_name, vmem->name, 5)) {
 				ring = vmem;
 				break;

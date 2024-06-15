@@ -50,13 +50,13 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
     if (wraparound) {
         uint32_t len_fst = driver->data_size - read_from_offset;
         uint32_t len_snd = read_to_offset;
-        fseek(read_from_offset, SEEK_SET);
+        fseek(stream, read_from_offset, SEEK_SET);
         size_t read_fst = fread(dataout, 1, len_fst, stream); // read first part
-        fseek(0, SEEK_SET);
+        fseek(stream, 0, SEEK_SET);
         size_t read_snd = fread(dataout + len_fst, 1, len_snd, stream); // read second part
     } else {
         uint32_t len = read_to_offset - read_from_offset;
-        fseek(read_from_offset, SEEK_SET);
+        fseek(stream, read_from_offset, SEEK_SET);
         size_t read = fread(dataout, 1, len, stream);
     }
     fclose(stream);
@@ -69,12 +69,12 @@ static int overtake(int old, int target, int new)
     return 0;
 }
 
-static int next(int current) 
+static int next(int current, int max) 
 { 
-    return (current + 1) % BUFFER_LIST_SIZE;
+    return (current + 1) % max;
 }
 
-void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, int len) {
+void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len) {
     vmem_ring_driver_t * driver = (vmem_ring_driver_t *)vmem->driver;
     
     uint32_t head = driver->head;
@@ -90,21 +90,21 @@ void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, int len)
 
     if (overtake(head_offset, tail_offset, new_head_offset)) 
     {
-        uint32_t next_tail = next(tail);
+        uint32_t next_tail = next(tail, driver->entries);
         uint32_t next_tail_offset = offsets[next_tail];
 
         while (!overtake(tail_offset, new_head_offset, next_tail_offset))
         {
             tail_offset = next_tail_offset;
-            next_tail = next(next_tail);
+            next_tail = next(next_tail, driver->entries);
             next_tail_offset = offsets[next_tail];
         }
         
         tail = next_tail;
     }
 
-    uint32_t new_head = next(head);
-    uint32_t new_tail = tail == new_head ? next(tail) : tail;
+    uint32_t new_head = next(head, driver->entries);
+    uint32_t new_tail = tail == new_head ? next(tail, driver->entries) : tail;
 
     FILE *stream = fopen(driver->filename, "a");
     if (stream == NULL)

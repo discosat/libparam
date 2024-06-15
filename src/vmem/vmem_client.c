@@ -189,7 +189,7 @@ int vmem_ring_upload(int node, int timeout, const char * vmem_name, char * datai
 	request->version = version;
 	request->type = VMEM_SERVER_RING_UPLOAD;
 	request->ring.offset = length;
-	request->ring.vmem_name = vmem_name;
+	strncpy(request->ring.vmem_name, vmem_name, 5);
 	packet->length = sizeof(vmem_request_t);
 
 	/* Send request */
@@ -260,7 +260,7 @@ int vmem_ring_download(int node, int timeout, const char * vmem_name, uint32_t o
 	request->version = version;
 	request->type = VMEM_SERVER_RING_DOWNLOAD;
 	request->ring.offset = offset;
-	request->ring.vmem_name = vmem_name;
+	strncpy(request->ring.vmem_name, vmem_name, 5);
 	packet->length = sizeof(vmem_request_t);
 
 	/* Send request */
@@ -268,7 +268,7 @@ int vmem_ring_download(int node, int timeout, const char * vmem_name, uint32_t o
 
 	packet = csp_read(conn, timeout);
 	if (packet == NULL)
-		return;
+		return -1;
 	uint32_t length = *(uint32_t *)packet->data;
 	csp_buffer_free(packet);
 

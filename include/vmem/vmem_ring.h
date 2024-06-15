@@ -20,16 +20,16 @@ typedef struct {
 } vmem_ring_driver_t;
 
 void vmem_ring_init(vmem_t * vmem);
-void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, int offset);
+void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offset);
 void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len);
 
-#define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, entries) \
-	uint32_t ring_##name_in##_offsets[entries] = {}; \
+#define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, entries_in) \
+	uint32_t vmem_##name_in##_offsets[entries_in] = {}; \
     static vmem_ring_driver_t vmem_##name_in##_driver = { \
         .data_size = size_in, \
-        .entries = entries, \
+        .entries = entries_in, \
         .filename = filename_in, \
-		.offsets = ring_##name_in##_offsets, \
+		.offsets = vmem_##name_in##_offsets, \
 	}; \
 	__attribute__((section("vmem"))) \
 	__attribute__((aligned(1))) \
@@ -37,7 +37,7 @@ void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t
 	vmem_t vmem_##name_in = { \
 		.type = VMEM_TYPE_FILE, \
 		.name = strname, \
-		.size = size_in + ((entries + 2) * sizeof(uint32_t)), \
+		.size = size_in + ((entries_in + 2) * sizeof(uint32_t)), \
 		.read = vmem_ring_read, \
 		.write = vmem_ring_write, \
 		.driver = &vmem_##name_in##_driver, \
