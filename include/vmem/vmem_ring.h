@@ -10,45 +10,38 @@
 
 #include <vmem/vmem.h>
 
-#define OFFSETS_ID 100
-#define TAIL_ID 101
-#define HEAD_ID 102
-
 typedef struct {
-    uint32_t size;
+    uint32_t data_size;
     uint32_t entries;
     char * filename;
-	param_t * offsets_p;
-	param_t * tail_p;
-	param_t * head_p;
+	void * offsets;
+	uint32_t tail;
+	uint32_t head;
 } vmem_ring_driver_t;
 
+void vmem_ring_init(vmem_t * vmem);
 void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, int offset);
 void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len);
 
-#define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, max_entries) \
+#define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, entries) \
+	uint32_t ring_##name_in##_offsets[entries] = {}; \
+    static vmem_ring_driver_t vmem_##name_in##_driver = { \
+        .data_size = size_in, \
+        .entries = entries, \
+        .filename = filename_in, \
+		.offsets = ring_##name_in##_offsets, \
+	}; \
 	__attribute__((section("vmem"))) \
 	__attribute__((aligned(1))) \
 	__attribute__((used)) \
 	vmem_t vmem_##name_in = { \
 		.type = VMEM_TYPE_FILE, \
 		.name = strname, \
-		.size = size_in + (max_entries * sizeof(uint32_t)) + 8, \
+		.size = size_in + ((entries + 2) * sizeof(uint32_t)), \
 		.read = vmem_ring_read, \
 		.write = vmem_ring_write, \
+		.driver = &vmem_##name_in##_driver, \
 		.ack_with_pull = 1, \
 	}; \
-    PARAM_DEFINE_STATIC_VMEM(OFFSETS_ID, offsets, PARAM_TYPE_INT32, max_entries, sizeof(uint32_t), PM_CONF, NULL, NULL, name_in, size_in, "Ring buffer image offsets"); \
-    PARAM_DEFINE_STATIC_VMEM(TAIL_ID, tail, PARAM_TYPE_INT32, -1, 0, PM_CONF, NULL, NULL, name_in, size_in + (max_entries * sizeof(uint32_t)), "Start of oldest image index"); \
-    PARAM_DEFINE_STATIC_VMEM(HEAD_ID, head, PARAM_TYPE_INT32, -1, 0, PM_CONF, NULL, NULL, name_in, size_in + (max_entries * sizeof(uint32_t)) + 4, "End of newest image index"); \
-    static vmem_ring_driver_t vmem_##name_in##_params = { \
-        .size = size_in, \
-        .entries = max_entries, \
-        .filename = filename_in, \
-		.offsets_p = offsets, \
-		.tail_p = tail, \
-		.head_p = head, \
-	}; \
-    vmem_##name_in.driver = &vmem_##name_in##_params; \
 
 #endif /* LIB_PARAM_INCLUDE_VMEM_VMEM_RING_H_ */
