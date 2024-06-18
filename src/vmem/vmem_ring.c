@@ -14,13 +14,15 @@ void vmem_ring_init(vmem_t * vmem) {
     vmem_ring_driver_t * driver = (vmem_ring_driver_t *) vmem->driver;
 
 	FILE * stream = fopen(driver->filename, "r+");
-	if (stream == NULL)
+	if (stream == NULL) {
+        stream = fopen(driver->filename, "w+");
 		return;
+    }
     
-    fseek(stream, driver->data_size, SEEK_SET);
-	fread(&driver->tail, 1, sizeof(uint32_t), stream);
-	fread(&driver->head, 1, sizeof(uint32_t), stream);
-    fread(driver->offsets, 1, driver->entries * sizeof(uint32_t), stream);
+    fseek(stream, 0, SEEK_SET);
+	fread(&driver->tail, sizeof(uint32_t), 1, stream);
+	fread(&driver->head, sizeof(uint32_t), 1, stream);
+    fread(driver->offsets, sizeof(uint32_t), driver->entries, stream);
 	fclose(stream);
 }
 
@@ -42,22 +44,22 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
     
     int wraparound = read_to_offset < read_from_offset; 
 
-    FILE *stream = fopen(driver->filename, "r");
+    FILE *stream = fopen(driver->filename, "r+");
     if (stream == NULL)
 		return;
     
     /* Adjust read address and length in case of wraparound */
+    uint32_t driver_meta_size = (driver->entries + 2) * sizeof(uint32_t); // offset with initial metadata
+    fseek(stream, read_from_offset + driver_meta_size, SEEK_SET);
     if (wraparound) {
         uint32_t len_fst = driver->data_size - read_from_offset;
         uint32_t len_snd = read_to_offset;
-        fseek(stream, read_from_offset, SEEK_SET);
-        fread(dataout, 1, len_fst, stream); // read first part
-        fseek(stream, 0, SEEK_SET);
-        fread(dataout + len_fst, 1, len_snd, stream); // read second part
+        fread(dataout, len_fst, 1, stream); // read first part
+        fseek(stream, driver_meta_size, SEEK_SET);
+        fread((char *)dataout + len_fst, len_snd, 1, stream); // read second part
     } else {
         uint32_t len = read_to_offset - read_from_offset;
-        fseek(stream, read_from_offset, SEEK_SET);
-        fread(dataout, 1, len, stream);
+        fread(dataout, len, 1, stream);
     }
     fclose(stream);
 }
@@ -106,21 +108,21 @@ void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t
     uint32_t new_head = next(head, driver->entries);
     uint32_t new_tail = tail == new_head ? next(tail, driver->entries) : tail;
 
-    FILE *stream = fopen(driver->filename, "a");
+    FILE *stream = fopen(driver->filename, "r+");
     if (stream == NULL)
 		return;
     
     /* Adjust read address and length in case of wraparound */
+    uint32_t driver_meta_size = (driver->entries + 2) * sizeof(uint32_t); // offset with initial metadata
+    fseek(stream, insert_offset + driver_meta_size, SEEK_SET);
     if (wraparound) {
         uint32_t len_fst = driver->data_size - insert_offset;
         uint32_t len_snd = new_head_offset;
-        fseek(stream, insert_offset, SEEK_SET);
-        fwrite(datain, 1, len_fst, stream); // write first part
-        fseek(stream, 0, SEEK_SET);
-        fwrite(datain + len_fst, 1, len_snd, stream); // write second part
+        fwrite(datain, len_fst, 1, stream); // write first part
+        fseek(stream, driver_meta_size, SEEK_SET);
+        fwrite((const char *)datain + len_fst, len_snd, 1, stream); // write second part
     } else {
-        fseek(stream, insert_offset, SEEK_SET);
-        fwrite(datain, 1, len, stream);
+        fwrite(datain, len, 1, stream);
     }
 
     /* Update driver values (tail, head, offsets) */
@@ -128,9 +130,9 @@ void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t
     driver->head = new_head;
     offsets[new_head] = new_head_offset;
     
-    fseek(stream, driver->data_size, SEEK_SET);
-    fwrite(&new_tail, 1, sizeof(uint32_t), stream);
-    fwrite(&new_head, 1, sizeof(uint32_t), stream);
-    fwrite(offsets, 1, driver->entries * sizeof(uint32_t), stream);
+    fseek(stream, 0, SEEK_SET);
+    fwrite(&new_tail, sizeof(uint32_t), 1, stream);
+    fwrite(&new_head, sizeof(uint32_t), 1, stream);
+    fwrite(offsets, sizeof(uint32_t), driver->entries, stream);
     fclose(stream);
 }

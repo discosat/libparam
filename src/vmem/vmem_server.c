@@ -221,14 +221,15 @@ void vmem_server_handler(csp_conn_t * conn)
 	 */
 	} else if (request->type == VMEM_SERVER_RING_DOWNLOAD) {
 
-		vmem_t *ring;
+		vmem_t *ring = NULL;
 		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++) {
-			if (strncmp(request->ring.vmem_name, vmem->name, 5)) {
+			if (strncmp(request->ring.vmem_name, vmem->name, 5) == 0) {
 				ring = vmem;
 				break;
 			}
-			return;
 		}
+		if (ring == NULL) return;
+		
 		uint32_t offset = request->ring.offset;
 		csp_buffer_free(packet);
 
@@ -252,7 +253,7 @@ void vmem_server_handler(csp_conn_t * conn)
 			: read_to_offset - read_from_offset;
 
 		/* Read image data from ring-buffer */
-		void * buffer[length];
+		unsigned char buffer[length];
 		ring->read(ring, 0, buffer, offset);
 
 		/* Send download size to client */
@@ -260,32 +261,26 @@ void vmem_server_handler(csp_conn_t * conn)
 		if (packet == NULL) {
 			return;
 		}
-		memcpy(packet->data, &length, sizeof(uint32_t));
+		packet->length = sizeof(uint32_t);
+		memcpy(packet->data, &length, packet->length);
 		csp_send(conn, packet);
 		
 		unsigned int count = 0;
-		if (type == VMEM_SERVER_DOWNLOAD) {
-			/* We have to free the requesting packet, since we are going to
-			 * allocate a bunch of them for the reply.
-			 */
-			csp_buffer_free(packet);
-
-			while((count < length) && csp_conn_is_active(conn)) {
-				/* Prepare packet */
-				csp_packet_t * packet = csp_buffer_get(VMEM_SERVER_MTU);
-				if (packet == NULL) {
-					break;
-				}
-				packet->length = VMEM_MIN(VMEM_SERVER_MTU, length - count);
-
-				/* Get data */
-				memcpy(packet->data, buffer + count, packet->length);
-
-				/* Increment */
-				count += packet->length;
-
-				csp_send(conn, packet);
+		while((count < length) && csp_conn_is_active(conn)) {
+			/* Prepare packet */
+			csp_packet_t * packet = csp_buffer_get(VMEM_SERVER_MTU);
+			if (packet == NULL) {
+				break;
 			}
+			packet->length = VMEM_MIN(VMEM_SERVER_MTU, length - count);
+
+			/* Get data */
+			memcpy(packet->data, buffer + count, packet->length);
+
+			/* Increment */
+			count += packet->length;
+
+			csp_send(conn, packet);
 		}
 
 	/**
@@ -293,7 +288,7 @@ void vmem_server_handler(csp_conn_t * conn)
 	 */
 	} else if (request->type == VMEM_SERVER_RING_UPLOAD) {
 		int length = request->ring.offset;
-		void * buffer[length];
+		unsigned char buffer[length];
 
 		csp_buffer_free(packet);
 
@@ -312,14 +307,14 @@ void vmem_server_handler(csp_conn_t * conn)
 		}
 
 		/* After transfer, write data to VMEM */
-		vmem_t *ring;
+		vmem_t *ring = NULL;
 		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++) {
 			if (strncmp(request->ring.vmem_name, vmem->name, 5)) {
 				ring = vmem;
 				break;
 			}
-			return;
 		}
+		if (ring == NULL) return;
 		ring->write(ring, 0, buffer, length);
 
 	} else {

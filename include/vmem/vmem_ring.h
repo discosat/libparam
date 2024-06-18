@@ -24,12 +24,14 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
 void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len);
 
 #define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, entries_in) \
-	uint32_t vmem_##name_in##_offsets[entries_in] = {}; \
+	uint32_t vmem_##name_in##_offsets[entries_in] = {0}; \
     static vmem_ring_driver_t vmem_##name_in##_driver = { \
         .data_size = size_in, \
         .entries = entries_in, \
         .filename = filename_in, \
 		.offsets = vmem_##name_in##_offsets, \
+		.tail = 0, \
+		.head = 0, \
 	}; \
 	__attribute__((section("vmem"))) \
 	__attribute__((aligned(1))) \
