@@ -16,6 +16,9 @@ void vmem_ring_init(vmem_t * vmem) {
 	FILE * stream = fopen(driver->filename, "r+");
 	if (stream == NULL) {
         stream = fopen(driver->filename, "w+");
+        fwrite(&driver->tail, sizeof(uint32_t), 1, stream);
+        fwrite(&driver->head, sizeof(uint32_t), 1, stream);
+        fwrite(driver->offsets, sizeof(uint32_t), driver->entries, stream);
 		return;
     }
     
@@ -64,10 +67,11 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
     fclose(stream);
 }
 
-static int overtake(int old, int target, int new) 
+static int overtake(int before, int target, int after) 
 {
-    if (old < target && target < new) return 1; // Simple overtake
-    if (target < old && target < new && new < old) return 1; // Wraparound overtake
+    if (before < target && target < after) return 1; // Simple overtake
+    if (target < before && target < after && after < before) return 1; // After wraparound overtake
+    if (before < target && after < target && after < before) return 1; // Before wraparound overtake
     return 0;
 }
 
