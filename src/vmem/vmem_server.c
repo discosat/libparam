@@ -22,6 +22,8 @@
 #include <libparam.h>
 #include <param/param_server.h>
 
+#include <vmem/vmem_ring.h>
+
 static int unlocked = 0;
 
 void vmem_server_handler(csp_conn_t * conn)
@@ -213,6 +215,114 @@ void vmem_server_handler(csp_conn_t * conn)
 		}
 
 		csp_send(conn, packet);
+
+	/**
+	 * RING BUFFER DOWNLOAD
+	 */
+	} else if (request->type == VMEM_SERVER_RING_DOWNLOAD) {
+
+		vmem_t *ring = NULL;
+		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++) {
+			if (strncmp(request->ring.vmem_name, vmem->name, 5) == 0) {
+				ring = vmem;
+				break;
+			}
+		}
+		if (ring == NULL) return;
+		
+		uint32_t offset = request->ring.offset;
+		csp_buffer_free(packet);
+
+		/* Find size of download */	
+		vmem_ring_driver_t * driver = (vmem_ring_driver_t *)ring->driver;
+
+		uint32_t head = driver->head;
+		uint32_t tail = driver->tail;
+		uint32_t * offsets = (uint32_t *)driver->offsets;
+
+		int offset_int = (int)offset;
+
+		/* Determine if requested offset is out of bounds */
+		int num_entries = tail < head ? head - tail : driver->entries - tail + head;
+		int max_offset = num_entries - 1;
+		int min_offset = num_entries * -1;
+		if (offset_int < min_offset || offset_int > max_offset) return;
+		
+		/* Determine read length */
+		uint32_t read_from_index = offset_int < 0 // supports negative indexing from head
+			? (head + offset_int + driver->entries) % driver->entries
+			: (tail + offset_int) % driver->entries;
+		uint32_t read_to_index = (read_from_index + 1) % driver->entries;
+		uint32_t read_from_offset = offsets[read_from_index];
+		uint32_t read_to_offset = offsets[read_to_index];
+		uint32_t length = read_from_index > read_to_offset
+			? driver->data_size - read_from_offset + read_to_offset
+			: read_to_offset - read_from_offset;
+
+		/* Read image data from ring-buffer */
+		unsigned char buffer[length];
+		ring->read(ring, 0, buffer, offset);
+
+		/* Send download size to client */
+		csp_packet_t * packet = csp_buffer_get(VMEM_SERVER_MTU);
+		if (packet == NULL) {
+			return;
+		}
+		packet->length = sizeof(uint32_t);
+		memcpy(packet->data, &length, packet->length);
+		csp_send(conn, packet);
+		
+		unsigned int count = 0;
+		while((count < length) && csp_conn_is_active(conn)) {
+			/* Prepare packet */
+			csp_packet_t * packet = csp_buffer_get(VMEM_SERVER_MTU);
+			if (packet == NULL) {
+				break;
+			}
+			packet->length = VMEM_MIN(VMEM_SERVER_MTU, length - count);
+
+			/* Get data */
+			memcpy(packet->data, buffer + count, packet->length);
+
+			/* Increment */
+			count += packet->length;
+
+			csp_send(conn, packet);
+		}
+
+	/**
+	 * RING BUFFER UPLOAD
+	 */
+	} else if (request->type == VMEM_SERVER_RING_UPLOAD) {
+		int length = request->ring.offset;
+		unsigned char buffer[length];
+
+		csp_buffer_free(packet);
+
+		int count = 0;
+		while((packet = csp_read(conn, VMEM_SERVER_TIMEOUT)) != NULL) {
+
+			//csp_hex_dump("Upload", packet->data, packet->length);
+
+			/* Put data in buffer */
+			memcpy(buffer + count, packet->data, packet->length);
+
+			/* Increment */
+			count += packet->length;
+
+			csp_buffer_free(packet);
+		}
+
+		/* After transfer, write data to VMEM */
+		vmem_t *ring = NULL;
+		for(vmem_t * vmem = (vmem_t *) &__start_vmem; vmem < (vmem_t *) &__stop_vmem; vmem++) {
+			if (strncmp(request->ring.vmem_name, vmem->name, 5)) {
+				ring = vmem;
+				break;
+			}
+		}
+		if (ring == NULL) return;
+		ring->write(ring, 0, buffer, length);
 
 	} else {
 

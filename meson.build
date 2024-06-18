@@ -65,6 +65,7 @@ if get_option('have_fopen') == true
 	param_src += files([
 		'src/vmem/vmem_file.c',
 		'src/vmem/vmem_mmap.c',
+		'src/vmem/vmem_ring.c',
 		#'src/param/list/param_list_store_vmem.c',
 	])
 endif
