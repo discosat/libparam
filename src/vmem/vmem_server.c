@@ -241,11 +241,18 @@ void vmem_server_handler(csp_conn_t * conn)
 		uint32_t * offsets = (uint32_t *)driver->offsets;
 
 		int offset_int = (int)offset;
+
+		/* Determine if requested offset is out of bounds */
+		int num_entries = tail < head ? head - tail : driver->entries - tail + head;
+		int max_offset = num_entries - 1;
+		int min_offset = num_entries * -1;
+		if (offset_int < min_offset || offset_int > max_offset) return;
+		
+		/* Determine read length */
 		uint32_t read_from_index = offset_int < 0 // supports negative indexing from head
 			? (head + offset_int + driver->entries) % driver->entries
 			: (tail + offset_int) % driver->entries;
 		uint32_t read_to_index = (read_from_index + 1) % driver->entries;
-
 		uint32_t read_from_offset = offsets[read_from_index];
 		uint32_t read_to_offset = offsets[read_to_index];
 		uint32_t length = read_from_index > read_to_offset
