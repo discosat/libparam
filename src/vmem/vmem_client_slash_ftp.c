@@ -134,7 +134,7 @@ static int vmem_client_slash_download(struct slash *slash)
 		return SLASH_EINVAL;
 	}
 
-	printf("Download from %u addr 0x%"PRIX64" to %s with timeout %u version %u\n", node, address + offset, file, timeout, version);
+	printf("Download %"PRIu32" bytes from %u addr 0x%"PRIX64" to %s with timeout %u version %u\n", length, node, address + offset, file, timeout, version);
 
 	/* Allocate memory for reply */
 	char * data = malloc(length - offset);
@@ -210,7 +210,7 @@ static int vmem_client_slash_upload(struct slash *slash)
 	}
 
 	char * endptr;
-	uint64_t address = strtoul(slash->argv[argi], &endptr, 16);
+	uint64_t address = strtoull(slash->argv[argi], &endptr, 16);
 	if (*endptr != '\0') {
 		printf("Failed to parse address\n");
 		optparse_del(parser);
