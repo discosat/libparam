@@ -29,23 +29,12 @@ void vmem_ring_init(vmem_t * vmem) {
 	fclose(stream);
 }
 
-void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offset) {
+// Offset specifies the offset within the vmem ring buffer where the read should begin
+void vmem_ring_read(vmem_t * vmem, uint32_t offset, void * dataout, uint32_t len) {
+
     vmem_ring_driver_t * driver = (vmem_ring_driver_t *)vmem->driver;
 
-    uint32_t head = driver->head;
-    uint32_t tail = driver->tail;
-    uint32_t * offsets = (uint32_t *)driver->offsets;
-
-    int offset_int = (int)offset;
-    uint32_t read_from_index = offset_int < 0 // supports negative indexing from head
-        ? (head + offset_int + driver->entries) % driver->entries
-        : (tail + offset_int) % driver->entries;
-    uint32_t read_to_index = (read_from_index + 1) % driver->entries;
-
-    uint32_t read_from_offset = offsets[read_from_index];
-    uint32_t read_to_offset = offsets[read_to_index];
-    
-    int wraparound = read_to_offset < read_from_offset; 
+    int wraparound = (offset + len) > driver->data_size;
 
     FILE *stream = fopen(driver->filename, "r+");
     if (stream == NULL)
@@ -53,16 +42,16 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
     
     /* Adjust read address and length in case of wraparound */
     uint32_t driver_meta_size = (driver->entries + 2) * sizeof(uint32_t); // offset with initial metadata
-    fseek(stream, read_from_offset + driver_meta_size, SEEK_SET);
+    fseek(stream, offset + driver_meta_size, SEEK_SET);
     if (wraparound) {
-        uint32_t len_fst = driver->data_size - read_from_offset;
-        uint32_t len_snd = read_to_offset;
+        uint32_t len_fst = driver->data_size - offset;
+        uint32_t len_snd = (driver->data_size + offset) % driver->data_size;
         fread(dataout, len_fst, 1, stream); // read first part
         fseek(stream, driver_meta_size, SEEK_SET);
         fread((char *)dataout + len_fst, len_snd, 1, stream); // read second part
     } else {
-        uint32_t len = read_to_offset - read_from_offset;
-        fread(dataout, len, 1, stream);
+        // This could also be fread(dataout, len, 1, stream), difference: https://stackoverflow.com/questions/295994/what-is-the-rationale-for-fread-fwrite-taking-size-and-count-as-arguments
+        fread(dataout, 1, len, stream);
     }
     fclose(stream);
 }
