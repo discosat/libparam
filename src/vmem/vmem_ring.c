@@ -196,3 +196,14 @@ int vmem_ring_is_valid_index(vmem_t * vmem, uint32_t index) {
         return (tail <= ring_buffer_index) && (ring_buffer_index < head);
     }
 }
+
+// Get the amount of elements within the ring buffer
+uint32_t vmem_ring_get_amount_of_elements(vmem_t * vmem) {
+    vmem_ring_driver_t * driver = (vmem_ring_driver_t *)vmem->driver;
+
+    if (driver->head >= driver->tail) {
+        return driver->head - driver->tail;
+    } else {
+        return driver->entries - driver->tail + driver->head;
+    }
+}

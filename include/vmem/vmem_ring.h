@@ -24,7 +24,8 @@ void vmem_ring_read(vmem_t * vmem, uint32_t addr, void * dataout, uint32_t offse
 void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t len);
 uint32_t vmem_ring_offset(vmem_t * vmem, uint32_t index, uint32_t offset);
 uint32_t vmem_ring_element_size(vmem_t * vmem, uint32_t index);
-uint32_t vmem_ring_is_valid_index(vmem_t * vmem, uint32_t index);
+int vmem_ring_is_valid_index(vmem_t * vmem, uint32_t index);
+uint32_t vmem_ring_get_amount_of_elements(vmem_t * vmem);
 
 #define VMEM_DEFINE_RING(name_in, strname, filename_in, size_in, entries_in) \
 	uint32_t vmem_##name_in##_offsets[entries_in] = {0}; \
