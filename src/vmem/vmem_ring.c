@@ -129,3 +129,70 @@ void vmem_ring_write(vmem_t * vmem, uint32_t addr, const void * datain, uint32_t
     fwrite(offsets, sizeof(uint32_t), driver->entries, stream);
     fclose(stream);
 }
+
+// Ring buffer utility functions
+
+// Calculate the offset of an element within the ring buffer based on the index
+uint32_t vmem_ring_offset(vmem_t * vmem, uint32_t index, uint32_t offset_within_element) {
+    
+    vmem_ring_driver_t * driver = (vmem_ring_driver_t *)vmem->driver;
+
+    uint32_t head = driver->head;
+    uint32_t tail = driver->tail;
+    uint32_t * offsets = (uint32_t *)driver->offsets;
+
+    uint32_t ring_buffer_index = (tail + index) % driver->entries;
+
+    uint32_t offset_of_element = offsets[ring_buffer_index];
+
+    return offset_within_element + offset_within_element;
+
+}
+
+// Find the size of an element within the ring buffer based on the index
+uint32_t vmem_ring_element_size(vmem_t * vmem, uint32_t index) {
+    vmem_ring_driver_t * driver = (vmem_ring_driver_t *)vmem->driver;
+
+    uint32_t head = driver->head;
+    uint32_t tail = driver->tail;
+    uint32_t * offsets = (uint32_t *)driver->offsets;
+
+    uint32_t read_from_index = (tail + index) % driver->entries;
+    uint32_t read_to_index = (read_from_index + 1) % driver->entries;
+
+    uint32_t read_from_offset = offsets[read_from_index];
+    uint32_t read_to_offset = offsets[read_to_index];
+
+    int wraparound = read_to_offset < read_from_offset; 
+
+    uint32_t len;
+
+    if (wraparound) {
+        len = driver->data_size - read_from_offset + read_to_offset;
+    } else {
+        len = read_to_offset - read_from_offset;
+    }
+
+    return len;
+}
+
+// Check if the index provided is a valid ring buffer index
+int vmem_ring_is_valid_index(vmem_t * vmem, uint32_t index) {
+    vmem_ring_driver_t * driver = vmem->driver;
+
+    if (index >= driver->entries) return 0;
+
+    uint32_t head = driver->head;
+    uint32_t tail = driver->tail;
+    uint32_t * offsets = (uint32_t *)driver->offsets;
+
+    uint32_t ring_buffer_index = (tail + index) % driver->entries;
+
+    int wraparound = driver->head < driver->tail;
+
+    if (wraparound) {
+        return !((head <= ring_buffer_index) && (ring_buffer_index < tail));
+    } else {
+        return (tail <= ring_buffer_index) && (ring_buffer_index < head);
+    }
+}
