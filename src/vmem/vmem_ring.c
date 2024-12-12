@@ -145,7 +145,7 @@ uint32_t vmem_ring_offset(vmem_t * vmem, uint32_t index, uint32_t offset_within_
 
     uint32_t offset_of_element = offsets[ring_buffer_index];
 
-    return offset_within_element + offset_within_element;
+    return offset_within_element + offset_of_element;
 
 }
 
