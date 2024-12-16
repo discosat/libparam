@@ -152,9 +152,10 @@ static uint32_t cache_read(const vmem_block_driver_t *drv, vmem_block_cache_t *c
     uint32_t size = 0;
     uint64_t addr = address;
 
-    //printf("::cache_read(%p,0x%"PRIX64",0x%"PRIXPTR",%"PRIu32")\n", drv, address, data, length);
+    //printf("::cache_read(%p,0x%"PRIX64",%"PRIu32")\n", drv, address, (length ? (*length) : 0));
 
-    if (!cache && data != (uintptr_t)NULL && length > 0) {
+    if (!address_in_cache(drv, cache, address)) {
+        //printf("::cache_read() Address not in cache, read from device\n");
         int32_t res;
         uint32_t len = 0;
 
